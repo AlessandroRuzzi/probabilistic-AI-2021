@@ -1,4 +1,5 @@
 import os
+from re import VERBOSE
 import typing
 
 from sklearn.gaussian_process.kernels import *
@@ -36,7 +37,9 @@ class Model(object):
         We already provide a random number generator for reproducibility.
         """
         self.rng = np.random.default_rng(seed=0)
-        self.gp_model = GaussianProcessRegressor()
+
+        kernel = DotProduct()
+        self.gp_model = GaussianProcessRegressor(kernel=kernel)
 
     def predict(self, x: np.ndarray) -> typing.Tuple[np.ndarray, np.ndarray, np.ndarray]:
         """
@@ -53,7 +56,7 @@ class Model(object):
 
         # TODO: Use the GP posterior to form your predictions here
         #predictions = gp_mean
-        predictions  = self.gp_model.predict(x)
+        predictions,gp_std  = self.gp_model.predict(x,return_std=True)
 
         return predictions, gp_mean, gp_std
 
@@ -63,7 +66,7 @@ class Model(object):
         :param train_x: Training features as a 2d NumPy float array of shape (NUM_SAMPLES, 2)
         :param train_y: Training pollution concentrations as a 1d NumPy float array of shape (NUM_SAMPLES,)
         """
-
+        
         self.gp_model.fit(train_x,train_y)
         
 
