@@ -161,9 +161,9 @@ def perform_extended_evaluation(model: Model, output_dir: str = '/results'):
 
 def main():
     # Load the training dateset and test features
-    train_x = np.loadtxt('train_x.csv', delimiter=',', skiprows=1)
-    train_y = np.loadtxt('train_y.csv', delimiter=',', skiprows=1)
-    test_x = np.loadtxt('test_x.csv', delimiter=',', skiprows=1)
+    train_x = np.loadtxt('GP regression/train_x.csv', delimiter=',', skiprows=1)
+    train_y = np.loadtxt('GP regression/train_y.csv', delimiter=',', skiprows=1)
+    test_x = np.loadtxt('GP regression/test_x.csv', delimiter=',', skiprows=1)
 
     # Fit the model
     print('Fitting model')
