@@ -52,7 +52,8 @@ class Model(object):
         gp_std = np.zeros(x.shape[0], dtype=float)
 
         # TODO: Use the GP posterior to form your predictions here
-        predictions = gp_mean
+        #predictions = gp_mean
+        predictions  = self.gp_model.predict(x)
 
         return predictions, gp_mean, gp_std
 
@@ -162,7 +163,7 @@ def main():
     # Load the training dateset and test features
     train_x = np.loadtxt('GP regression/train_x.csv', delimiter=',', skiprows=1)
     train_y = np.loadtxt('GP regression/train_y.csv', delimiter=',', skiprows=1)
-    test_x = np.loadtxt('test_x.csv', delimiter=',', skiprows=1)
+    test_x = np.loadtxt('GP regression/test_x.csv', delimiter=',', skiprows=1)
 
     # Fit the model
     print('Fitting model')
