@@ -158,7 +158,7 @@ def perform_extended_evaluation(model: Model, output_dir: str = '/results'):
 
     plt.show()
 
-#branch
+
 def main():
     # Load the training dateset and test features
     train_x = np.loadtxt('GP regression/train_x.csv', delimiter=',', skiprows=1)
