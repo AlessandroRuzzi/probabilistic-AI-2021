@@ -36,8 +36,7 @@ class Model(object):
         We already provide a random number generator for reproducibility.
         """
         self.rng = np.random.default_rng(seed=0)
-
-        # TODO: Add custom initialization for your model here if necessary
+        self.gp_model = GaussianProcessRegressor()
 
     def predict(self, x: np.ndarray) -> typing.Tuple[np.ndarray, np.ndarray, np.ndarray]:
         """
@@ -64,8 +63,8 @@ class Model(object):
         :param train_y: Training pollution concentrations as a 1d NumPy float array of shape (NUM_SAMPLES,)
         """
 
-        # TODO: Fit your model here
-        pass
+        self.gp_model.fit(train_x,train_y)
+        
 
 
 def cost_function(y_true: np.ndarray, y_predicted: np.ndarray) -> float:
