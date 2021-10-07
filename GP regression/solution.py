@@ -1,12 +1,16 @@
 import os
-from re import VERBOSE
+from re import VERBOSE, X
 import typing
 
 from sklearn.gaussian_process.kernels import *
 import numpy as np
+from sklearn.preprocessing import StandardScaler
 from sklearn.gaussian_process import GaussianProcessRegressor
+from sklearn.metrics.pairwise import polynomial_kernel
 from sklearn.model_selection import cross_val_score
 from sklearn.model_selection import KFold
+from sklearn.kernel_approximation import Nystroem
+from sklearn.pipeline import make_pipeline
 import matplotlib.pyplot as plt
 from matplotlib import cm
 
@@ -37,9 +41,12 @@ class Model(object):
         We already provide a random number generator for reproducibility.
         """
         self.rng = np.random.default_rng(seed=0)
+        self.scaler = StandardScaler()
 
-        kernel = DotProduct()
+        kernel = WhiteKernel()
         self.gp_model = GaussianProcessRegressor(kernel=kernel)
+        self.transform = Nystroem(kernel = kernel, random_state=0)
+        self.pipe  = make_pipeline(self.transform,self.gp_model)
 
     def predict(self, x: np.ndarray) -> typing.Tuple[np.ndarray, np.ndarray, np.ndarray]:
         """
@@ -56,7 +63,8 @@ class Model(object):
 
         # TODO: Use the GP posterior to form your predictions here
         #predictions = gp_mean
-        predictions,gp_std  = self.gp_model.predict(x,return_std=True)
+        #predictions,gp_std  = self.gp_model.predict(x,return_std=True)
+        predictions = self.pipe.predict(x)
 
         return predictions, gp_mean, gp_std
 
@@ -66,8 +74,7 @@ class Model(object):
         :param train_x: Training features as a 2d NumPy float array of shape (NUM_SAMPLES, 2)
         :param train_y: Training pollution concentrations as a 1d NumPy float array of shape (NUM_SAMPLES,)
         """
-        
-        self.gp_model.fit(train_x,train_y)
+        self.pipe.fit(train_x,train_y)
         
 
 
