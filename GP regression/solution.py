@@ -6,13 +6,6 @@ import torch
 
 from sklearn.gaussian_process.kernels import *
 import numpy as np
-from sklearn.preprocessing import StandardScaler
-from sklearn.gaussian_process import GaussianProcessRegressor
-from sklearn.metrics.pairwise import polynomial_kernel
-from sklearn.model_selection import cross_val_score
-from sklearn.model_selection import KFold
-from sklearn.kernel_approximation import Nystroem
-from sklearn.pipeline import make_pipeline
 import matplotlib.pyplot as plt
 from matplotlib import cm
 
@@ -54,6 +47,7 @@ class Model(object):
         We already provide a random number generator for reproducibility.
         """
         self.rng = np.random.default_rng(seed=0)
+        torch.manual_seed(0)
         self.training_iter = 50
 
     def predict(self, x: np.ndarray) -> typing.Tuple[np.ndarray, np.ndarray, np.ndarray]:
@@ -69,24 +63,16 @@ class Model(object):
         gp_std = np.zeros(x.shape[0], dtype=float)
         predictions = np.zeros(x.shape[0], dtype=float)
 
-        
+        # enable eval mode
         x = torch.Tensor(x)
         self.model.eval()
         self.likelihood.eval()
 
+        #make predictions
         with torch.no_grad(), gpytorch.settings.fast_pred_var():
-            test_x = torch.linspace(0, 1, 51)
             predictions = (self.likelihood(self.model(x))).mean.detach().numpy()
         
-        '''
-        gp_mean,gp_std  = self.gp_model.predict(x,return_std=True)
-        for i in range(len(gp_mean)):
-            if gp_mean[i] < THRESHOLD and gp_mean[i] >= THRESHOLD -1:
-                predictions[i] = THRESHOLD #+ gp_std[i]
-            else:
-                predictions[i] = gp_mean[i] 
-        #predictions = self.pipe.predict(x)
-        '''
+
         return predictions, gp_mean, gp_std
 
     def fit_model(self, train_x: np.ndarray, train_y: np.ndarray):
