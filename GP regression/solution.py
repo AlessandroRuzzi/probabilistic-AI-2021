@@ -1,6 +1,8 @@
 import os
 from re import VERBOSE, X
 import typing
+import gpytorch
+import torch
 
 from sklearn.gaussian_process.kernels import *
 import numpy as np
@@ -27,6 +29,17 @@ COST_W_NORMAL = 1.0
 COST_W_OVERPREDICT = 5.0
 COST_W_THRESHOLD = 20.0
 
+class MyGP(gpytorch.models.ExactGP):
+     def __init__(self, train_x, train_y, likelihood):
+        super().__init__(train_x, train_y, likelihood)
+        self.mean_module = gpytorch.means.ZeroMean()
+        self.covar_module = gpytorch.kernels.ScaleKernel(gpytorch.kernels.RBFKernel())
+
+     def forward(self, x):
+         mean = self.mean_module(x)
+         covar = self.covar_module(x)
+         return gpytorch.distributions.MultivariateNormal(mean, covar)
+
 
 class Model(object):
     """
@@ -43,9 +56,9 @@ class Model(object):
         self.rng = np.random.default_rng(seed=0)
         self.scaler = StandardScaler()
 
-        kernel = WhiteKernel()
-        self.gp_model = GaussianProcessRegressor(kernel=kernel)
-        self.transform = Nystroem(kernel = kernel, random_state=0)
+        kernel = RBF(length_scale=100.0,length_scale_bounds=(0.000000000001,1000000))
+        self.gp_model = GaussianProcessRegressor(kernel = kernel,n_restarts_optimizer=5,random_state= 0)
+        self.transform = Nystroem(random_state=0)
         self.pipe  = make_pipeline(self.transform,self.gp_model)
 
     def predict(self, x: np.ndarray) -> typing.Tuple[np.ndarray, np.ndarray, np.ndarray]:
@@ -60,12 +73,28 @@ class Model(object):
         # TODO: Use your GP to estimate the posterior mean and stddev for each location here
         gp_mean = np.zeros(x.shape[0], dtype=float)
         gp_std = np.zeros(x.shape[0], dtype=float)
+        predictions = np.zeros(x.shape[0], dtype=float)
 
         # TODO: Use the GP posterior to form your predictions here
         #predictions = gp_mean
-        #predictions,gp_std  = self.gp_model.predict(x,return_std=True)
-        predictions = self.pipe.predict(x)
+        #x = self.transform.transform(x)
+        x = torch.Tensor(x)
+        self.model.eval()
+        self.likelihood.eval()
 
+        with torch.no_grad(), gpytorch.settings.fast_pred_var():
+            test_x = torch.linspace(0, 1, 51)
+            predictions = (self.likelihood(self.model(x))).mean.detach().numpy()
+        
+        '''
+        gp_mean,gp_std  = self.gp_model.predict(x,return_std=True)
+        for i in range(len(gp_mean)):
+            if gp_mean[i] < THRESHOLD and gp_mean[i] >= THRESHOLD -1:
+                predictions[i] = THRESHOLD #+ gp_std[i]
+            else:
+                predictions[i] = gp_mean[i] 
+        #predictions = self.pipe.predict(x)
+        '''
         return predictions, gp_mean, gp_std
 
     def fit_model(self, train_x: np.ndarray, train_y: np.ndarray):
@@ -74,7 +103,42 @@ class Model(object):
         :param train_x: Training features as a 2d NumPy float array of shape (NUM_SAMPLES, 2)
         :param train_y: Training pollution concentrations as a 1d NumPy float array of shape (NUM_SAMPLES,)
         """
-        self.pipe.fit(train_x,train_y)
+        #data_transformed = self.transform.fit_transform(train_x,train_y)
+        #self.pipe.fit(data_transformed,train_y)
+        #self.gp_model.fit(train_x,train_y)
+        #print(self.gp_model.log_marginal_likelihood_value_)
+        #print(self.gp_model.score(train_x,train_y))
+        
+        train_x = torch.Tensor(train_x)
+        train_y = torch.Tensor(train_y)
+        self.likelihood = gpytorch.likelihoods.GaussianLikelihood()
+        self.model = MyGP(train_x, train_y, self.likelihood)
+
+        # Find optimal model hyperparameters
+        training_iter = 50
+        self.model.train()
+        self.likelihood.train()
+
+        # Use the adam optimizer
+        optimizer = torch.optim.Adam(self.model.parameters(), lr=0.1)  # Includes GaussianLikelihood parameters
+
+        # "Loss" for GPs - the marginal log likelihood
+        mll = gpytorch.mlls.ExactMarginalLogLikelihood(self.likelihood, self.model)
+
+        for i in range(training_iter):
+            # Zero gradients from previous iteration
+            optimizer.zero_grad()
+            # Output from model
+            output = self.model(train_x)
+            # Calc loss and backprop gradients
+            loss = -mll(output, train_y)
+            loss.backward()
+            print('Iter %d/%d - Loss: %.3f   lengthscale: %.3f   noise: %.3f' % (
+                i + 1, training_iter, loss.item(),
+                self.model.covar_module.base_kernel.lengthscale.item(),
+                self.model.likelihood.noise.item()
+            ))
+            optimizer.step()
         
 
 
