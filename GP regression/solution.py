@@ -54,12 +54,6 @@ class Model(object):
         We already provide a random number generator for reproducibility.
         """
         self.rng = np.random.default_rng(seed=0)
-        self.scaler = StandardScaler()
-
-        kernel = RBF(length_scale=100.0,length_scale_bounds=(0.000000000001,1000000))
-        self.gp_model = GaussianProcessRegressor(kernel = kernel,n_restarts_optimizer=5,random_state= 0)
-        self.transform = Nystroem(random_state=0)
-        self.pipe  = make_pipeline(self.transform,self.gp_model)
 
     def predict(self, x: np.ndarray) -> typing.Tuple[np.ndarray, np.ndarray, np.ndarray]:
         """
@@ -103,11 +97,6 @@ class Model(object):
         :param train_x: Training features as a 2d NumPy float array of shape (NUM_SAMPLES, 2)
         :param train_y: Training pollution concentrations as a 1d NumPy float array of shape (NUM_SAMPLES,)
         """
-        #data_transformed = self.transform.fit_transform(train_x,train_y)
-        #self.pipe.fit(data_transformed,train_y)
-        #self.gp_model.fit(train_x,train_y)
-        #print(self.gp_model.log_marginal_likelihood_value_)
-        #print(self.gp_model.score(train_x,train_y))
         
         train_x = torch.Tensor(train_x)
         train_y = torch.Tensor(train_y)
