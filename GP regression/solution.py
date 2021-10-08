@@ -54,24 +54,22 @@ class Model(object):
         We already provide a random number generator for reproducibility.
         """
         self.rng = np.random.default_rng(seed=0)
+        self.training_iter = 50
 
     def predict(self, x: np.ndarray) -> typing.Tuple[np.ndarray, np.ndarray, np.ndarray]:
         """
         Predict the pollution concentration for a given set of locations.
         :param x: Locations as a 2d NumPy float array of shape (NUM_SAMPLES, 2)
-        :return:
+        :return:s
             Tuple of three 1d NumPy float arrays, each of shape (NUM_SAMPLES,),
             containing your predictions, the GP posterior mean, and the GP posterior stddev (in that order)
         """
 
-        # TODO: Use your GP to estimate the posterior mean and stddev for each location here
         gp_mean = np.zeros(x.shape[0], dtype=float)
         gp_std = np.zeros(x.shape[0], dtype=float)
         predictions = np.zeros(x.shape[0], dtype=float)
 
-        # TODO: Use the GP posterior to form your predictions here
-        #predictions = gp_mean
-        #x = self.transform.transform(x)
+        
         x = torch.Tensor(x)
         self.model.eval()
         self.likelihood.eval()
@@ -97,14 +95,14 @@ class Model(object):
         :param train_x: Training features as a 2d NumPy float array of shape (NUM_SAMPLES, 2)
         :param train_y: Training pollution concentrations as a 1d NumPy float array of shape (NUM_SAMPLES,)
         """
-        
+
         train_x = torch.Tensor(train_x)
         train_y = torch.Tensor(train_y)
         self.likelihood = gpytorch.likelihoods.GaussianLikelihood()
         self.model = MyGP(train_x, train_y, self.likelihood)
 
-        # Find optimal model hyperparameters
-        training_iter = 50
+        # Enable train mode
+        
         self.model.train()
         self.likelihood.train()
 
@@ -114,7 +112,7 @@ class Model(object):
         # "Loss" for GPs - the marginal log likelihood
         mll = gpytorch.mlls.ExactMarginalLogLikelihood(self.likelihood, self.model)
 
-        for i in range(training_iter):
+        for i in range(self.training_iter):
             # Zero gradients from previous iteration
             optimizer.zero_grad()
             # Output from model
@@ -123,7 +121,7 @@ class Model(object):
             loss = -mll(output, train_y)
             loss.backward()
             print('Iter %d/%d - Loss: %.3f   lengthscale: %.3f   noise: %.3f' % (
-                i + 1, training_iter, loss.item(),
+                i + 1, self.training_iter, loss.item(),
                 self.model.covar_module.base_kernel.lengthscale.item(),
                 self.model.likelihood.noise.item()
             ))
