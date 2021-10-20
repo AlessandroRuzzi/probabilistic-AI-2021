@@ -22,6 +22,8 @@ COST_W_NORMAL = 1.0
 COST_W_OVERPREDICT = 5.0
 COST_W_THRESHOLD = 20.0
 
+#TODO try other kernels or other methods of gpytorch
+
 class MyGP(gpytorch.models.ExactGP):
      def __init__(self, train_x, train_y, likelihood):
         super().__init__(train_x, train_y, likelihood)
@@ -68,10 +70,15 @@ class Model(object):
         self.model.eval()
         self.likelihood.eval()
 
+        #TODO use the asymettric cost function to improve the score
+
         #make predictions
         with torch.no_grad(), gpytorch.settings.fast_pred_var():
             predictions = (self.likelihood(self.model(x))).mean.detach().numpy()
-        
+
+        for i in range(len(predictions)):
+            if(predictions[i] >= THRESHOLD - 3  and predictions[i] < THRESHOLD):
+                predictions[i] = THRESHOLD
 
         return predictions, gp_mean, gp_std
 
@@ -105,6 +112,7 @@ class Model(object):
             output = self.model(train_x)
             # Calc loss and backprop gradients
             loss = -mll(output, train_y)
+            #loss = - cost_function(train_y,output.mean)
             loss.backward()
             print('Iter %d/%d - Loss: %.3f   lengthscale: %.3f   noise: %.3f' % (
                 i + 1, self.training_iter, loss.item(),
