@@ -1,10 +1,19 @@
+def warn(*args, **kwargs):
+    pass
+import warnings
+warnings.warn = warn
+
 import random
 import os
 import typing
 import logging
 import numpy as np
 from scipy.optimize import fmin_l_bfgs_b
+from sklearn.gaussian_process.kernels import RBF, ConstantKernel
+from sklearn.gaussian_process import GaussianProcessRegressor 
 import matplotlib.pyplot as plt
+from scipy.stats import norm
+import pdb
 
 EXTENDED_EVALUATION = False
 # Set `EXTENDED_EVALUATION` to `True` in order to visualize your predictions.
@@ -21,32 +30,46 @@ class BO_algo(object):
         self.previous_points = []
         # IMPORTANT: DO NOT REMOVE THOSE ATTRIBUTES AND USE sklearn.gaussian_process.GaussianProcessRegressor instances!
         # Otherwise, the extended evaluation will break.
-        self.constraint_model = None  # TODO : GP model for the constraint function
-        self.objective_model = None  # TODO : GP model for your acquisition function
+        self.kernel_f = ConstantKernel(1.5) * RBF(1.5)
+        self.kernel_c = ConstantKernel(3.5) * RBF(2)
+
+        self.sigma_f = 0.01
+        self.sigma_c = 0.005
+
+        self.objective_model = GaussianProcessRegressor(kernel=self.kernel_f, alpha=self.sigma_f**2, optimizer=None)
+        self.constraint_model = GaussianProcessRegressor(kernel=self.kernel_c, alpha=self.sigma_c**2, optimizer=None)
+
+        self.x = [] 
+        self.c = []
+        self.z = []
+
+        self.first = True
 
     def next_recommendation(self) -> np.ndarray:
         """
         Recommend the next input to sample.
-
         Returns
         -------
         recommendation: np.ndarray
             1 x domain.shape[0] array containing the next point to evaluate
         """
-
         # TODO: enter your code here
-        # In implementing this function, you may use optimize_acquisition_function() defined below.
+
+        # if self.first:
+        #     self.first = False
+        #     return np.array([np.random.uniform(0,6), np.random.uniform(0,6)]).reshape(1,2)
+
+        return self.optimize_acquisition_function()
+
 
     def optimize_acquisition_function(self) -> np.ndarray:  # DON'T MODIFY THIS FUNCTION
         """
         Optimizes the acquisition function.
-
         Returns
         -------
         x_opt: np.ndarray
             1 x domain.shape[0] array containing the point that approximately maximizes the acquisition function.
         """
-
         def objective(x: np.array):
             return - self.acquisition_function(x)
 
@@ -70,53 +93,79 @@ class BO_algo(object):
     def acquisition_function(self, x: np.ndarray) -> np.ndarray:
         """
         Compute the acquisition function.
-
         Parameters
         ----------
         x: np.ndarray
             point in the domain of f
-
         Returns
         ------
         af_value: float
             value of the acquisition function at x
         """
-
         # TODO: enter your code here
-        raise NotImplementedError
+
+        x = x.reshape(1, -1)
+
+        mean_f, std_f = self.objective_model.predict(x, return_std=True)
+        mean_c, std_c = self.constraint_model.predict(x, return_std=True)
+
+        # passing with penalty: 30, kappa: 10, mutl_coeff std_c: 0.2
+        pen = 30
+        kappa = 10 
+        if mean_c + 0.2 * std_c > 0:
+            return mean_f + std_f * kappa - pen
+        else:
+            return mean_f + std_f * kappa
+
 
     def add_data_point(self, x: np.ndarray, z: float, c: float):
         """
         Add data points to the model.
-
         Parameters
         ----------
         x: np.ndarray
             point in the domain of f
-        z: np.ndarray
-            value of the acquisition function at x
-        c: np.ndarray
+        z: float 
+            value of the objective function at x
+        c: float 
             value of the condition function at x
         """
 
         assert x.shape == (1, 2)
         self.previous_points.append([float(x[:, 0]), float(x[:, 1]), float(z), float(c)])
         # TODO: enter your code here
-        raise NotImplementedError
+
+        if not len(self.x):
+            self.x = x
+        else:
+            self.x = np.vstack((self.x, x))
+
+        self.z.append(float(z))
+        self.c.append(float(c))
+
+        self.objective_model.fit(self.x, np.array(self.z))
+        self.constraint_model.fit(self.x, np.array(self.c))
+        
 
     def get_solution(self) -> np.ndarray:
         """
         Return x_opt that is believed to be the minimizer of f.
-
         Returns
         -------
         solution: np.ndarray
             1 x domain.shape[0] array containing the optimal solution of the problem
         """
-
         # TODO: enter your code here
-        raise NotImplementedError
 
+        index = -1
+        min_f = 99999999
+
+        for i in range(len(self.z)):
+            if (self.c[i] <= 0 and self.z[i] < min_f):
+                min_f = self.z[i]
+                index = i
+
+        return self.x[index]
 
 """ 
     Toy problem to check  you code works as expected
