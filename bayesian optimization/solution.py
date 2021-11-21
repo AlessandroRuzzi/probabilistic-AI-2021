@@ -1,8 +1,3 @@
-def warn(*args, **kwargs):
-    pass
-import warnings
-warnings.warn = warn
-
 import random
 import os
 import typing
@@ -12,8 +7,6 @@ from scipy.optimize import fmin_l_bfgs_b
 from sklearn.gaussian_process.kernels import RBF, ConstantKernel
 from sklearn.gaussian_process import GaussianProcessRegressor 
 import matplotlib.pyplot as plt
-from scipy.stats import norm
-import pdb
 
 EXTENDED_EVALUATION = False
 # Set `EXTENDED_EVALUATION` to `True` in order to visualize your predictions.
@@ -26,7 +19,6 @@ class BO_algo(object):
     def __init__(self):
         """Initializes the algorithm with a parameter configuration. """
 
-        # TODO: enter your code here
         self.previous_points = []
         # IMPORTANT: DO NOT REMOVE THOSE ATTRIBUTES AND USE sklearn.gaussian_process.GaussianProcessRegressor instances!
         # Otherwise, the extended evaluation will break.
@@ -43,8 +35,6 @@ class BO_algo(object):
         self.c = []
         self.z = []
 
-        self.first = True
-
     def next_recommendation(self) -> np.ndarray:
         """
         Recommend the next input to sample.
@@ -53,14 +43,7 @@ class BO_algo(object):
         recommendation: np.ndarray
             1 x domain.shape[0] array containing the next point to evaluate
         """
-        # TODO: enter your code here
-
-        # if self.first:
-        #     self.first = False
-        #     return np.array([np.random.uniform(0,6), np.random.uniform(0,6)]).reshape(1,2)
-
         return self.optimize_acquisition_function()
-
 
     def optimize_acquisition_function(self) -> np.ndarray:  # DON'T MODIFY THIS FUNCTION
         """
@@ -102,18 +85,15 @@ class BO_algo(object):
         af_value: float
             value of the acquisition function at x
         """
-        # TODO: enter your code here
-
         x = x.reshape(1, -1)
 
         mean_f, std_f = self.objective_model.predict(x, return_std=True)
         mean_c, std_c = self.constraint_model.predict(x, return_std=True)
 
-        # passing with penalty: 30, kappa: 10, mutl_coeff std_c: 0.2
-        pen = 30
-        kappa = 10 
+        constraint_penalty = 31
+        kappa = 17 
         if mean_c + 0.2 * std_c > 0:
-            return mean_f + std_f * kappa - pen
+            return mean_f + std_f * kappa - constraint_penalty
         else:
             return mean_f + std_f * kappa
 
@@ -133,7 +113,6 @@ class BO_algo(object):
 
         assert x.shape == (1, 2)
         self.previous_points.append([float(x[:, 0]), float(x[:, 1]), float(z), float(c)])
-        # TODO: enter your code here
 
         if not len(self.x):
             self.x = x
@@ -155,17 +134,16 @@ class BO_algo(object):
         solution: np.ndarray
             1 x domain.shape[0] array containing the optimal solution of the problem
         """
-        # TODO: enter your code here
 
-        index = -1
+        idx = 0 
         min_f = 99999999
 
         for i in range(len(self.z)):
-            if (self.c[i] <= 0 and self.z[i] < min_f):
+            if (self.z[i] < min_f and self.c[i] <= 0):
                 min_f = self.z[i]
-                index = i
+                idx = i
 
-        return self.x[index]
+        return self.x[idx]
 
 """ 
     Toy problem to check  you code works as expected
