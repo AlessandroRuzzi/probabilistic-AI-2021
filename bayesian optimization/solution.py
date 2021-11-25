@@ -22,15 +22,18 @@ class BO_algo(object):
         self.previous_points = []
         # IMPORTANT: DO NOT REMOVE THOSE ATTRIBUTES AND USE sklearn.gaussian_process.GaussianProcessRegressor instances!
         # Otherwise, the extended evaluation will break.
+
+        # objective function and constraint function kernels
         self.kernel_f = ConstantKernel(1.5) * RBF(1.5)
         self.kernel_c = ConstantKernel(3.5) * RBF(2)
-
+        # objective function and constraint function noises 
         self.sigma_f = 0.01
         self.sigma_c = 0.005
-
+        # use GPs for priors on f and c functions
+        # optimizer is None to keep hyperparameters fixed
         self.objective_model = GaussianProcessRegressor(kernel=self.kernel_f, alpha=self.sigma_f**2, optimizer=None)
         self.constraint_model = GaussianProcessRegressor(kernel=self.kernel_c, alpha=self.sigma_c**2, optimizer=None)
-
+        # save values encountered so far
         self.x = [] 
         self.c = []
         self.z = []
@@ -43,6 +46,7 @@ class BO_algo(object):
         recommendation: np.ndarray
             1 x domain.shape[0] array containing the next point to evaluate
         """
+        # always return values that optimize the acquisition function
         return self.optimize_acquisition_function()
 
     def optimize_acquisition_function(self) -> np.ndarray:  # DON'T MODIFY THIS FUNCTION
@@ -85,17 +89,23 @@ class BO_algo(object):
         af_value: float
             value of the acquisition function at x
         """
+        # x contains only one sample
         x = x.reshape(1, -1)
-
+        # use GPs to predict at new value
         mean_f, std_f = self.objective_model.predict(x, return_std=True)
         mean_c, std_c = self.constraint_model.predict(x, return_std=True)
-
+        # hyperparameters
         constraint_penalty = 31
         kappa = 17 
-        if mean_c + 0.2 * std_c > 0:
-            return mean_f + std_f * kappa - constraint_penalty
-        else:
-            return mean_f + std_f * kappa
+        c_std_multiplier = 0.2
+        # GP Upper Confidence Bound
+        ucb = mean_f + std_f * kappa
+        # we penalize the activation function value if it is likely that x
+        # breaks the constraint function 
+        if mean_c + c_std_multiplier * std_c > 0:
+            ucb -= constraint_penalty
+        
+        return ucb
 
 
     def add_data_point(self, x: np.ndarray, z: float, c: float):
@@ -113,15 +123,15 @@ class BO_algo(object):
 
         assert x.shape == (1, 2)
         self.previous_points.append([float(x[:, 0]), float(x[:, 1]), float(z), float(c)])
-
+        # initializes or adds last x to x values list
         if not len(self.x):
             self.x = x
         else:
             self.x = np.vstack((self.x, x))
-
+        # adds z and c to their respective list
         self.z.append(float(z))
         self.c.append(float(c))
-
+        # trains GPs on all data encountered so far 
         self.objective_model.fit(self.x, np.array(self.z))
         self.constraint_model.fit(self.x, np.array(self.c))
         
@@ -137,7 +147,7 @@ class BO_algo(object):
 
         idx = 0 
         min_f = 99999999
-
+        # selects the minimum value among the ones that satisfy the constraint
         for i in range(len(self.z)):
             if (self.z[i] < min_f and self.c[i] <= 0):
                 min_f = self.z[i]
