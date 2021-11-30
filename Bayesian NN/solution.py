@@ -16,7 +16,6 @@ from util import ece, ParameterDistribution
 # Set `EXTENDED_EVALUATION` to `True` in order to visualize your predictions.
 EXTENDED_EVALUATION = False
 
-
 def run_solution(dataset_train: torch.utils.data.Dataset, data_dir: str = os.curdir, output_dir: str = '/results/') -> 'Model':
     """
     Run your task 2 solution.
@@ -28,6 +27,11 @@ def run_solution(dataset_train: torch.utils.data.Dataset, data_dir: str = os.cur
     :param data_dir: Directory containing the datasets
     :return: Your trained model
     """
+    
+    np.random.seed(1805)
+    torch.manual_seed(1805)
+    torch.cuda.manual_seed(1805)
+    torch.backends.cudnn.deterministic = True
 
     # Create model
     model = Model()
@@ -341,8 +345,7 @@ class ScaleMixtureGaussian(ParameterDistribution):
         return (torch.log(self.pi * torch.exp(self.std_nrm_dist_a.log_prob(input)) + (1-self.pi) * torch.exp(self.std_nrm_dist_b.log_prob(input)))).sum()
     
     def sample(self) -> torch.Tensor:
-        # TODO: Implement this
-        raise NotImplementedError
+        pass
 
 class UnivariateGaussian(ParameterDistribution):
     """
