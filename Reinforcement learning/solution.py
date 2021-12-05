@@ -10,6 +10,7 @@ import torch
 from torch.optim import Adam
 import torch.nn as nn
 from torch.distributions.categorical import Categorical
+from torch.nn import MSELoss
 
 def discount_cumsum(x, discount):
     """
@@ -105,7 +106,17 @@ class MLPActorCritic(nn.Module):
         #    3. The log-probability of the action under the policy output distribution
         # Hint: This function is only called when interacting with the environment. You should use
         # `torch.no_grad` to ensure that it does not interfere with the gradient computation.
-        return 0, 0, 0
+        with torch.no_grad():
+            pi, logp = self.pi(state)
+            a = pi.sample()
+            v = self.v(state)
+            _, logp = self.pi(state, a)
+        if a.dim() == 0:
+            a = a.item()
+        return a, v, logp
+
+    def act(self, state):
+        return self.step(state)[0]
 
 
 class VPGBuffer:
@@ -158,13 +169,17 @@ class VPGBuffer:
         # 16 in the GAE paper (see task description) will be helpful, and so will
         # the discout_cumsum function at the top of this file. 
         
-        # deltas = rews[:-1] + ...
-        # self.phi_buf[path_slice] =
+        deltas = rews[:-1] + self.gamma * vals[1:] - vals[:-1]
+        self.phi_buf[path_slice] = discount_cumsum(deltas, self.gamma * self.lam)
+
+
 
         #TODO4: currently the return is the total discounted reward for the whole episode. 
         # Replace this by computing the reward-to-go for each timepoint.
         # Hint: use the discount_cumsum function.
-        self.ret_buf[path_slice] = discount_cumsum(rews, self.gamma)[0] * np.ones(self.ptr-self.path_start_idx)
+        #print(discount_cumsum(rews, self.gamma)[:-1])
+        rews_GT = rews[:-1]
+        self.ret_buf[path_slice] = discount_cumsum(rews_GT, self.gamma)
 
         self.path_start_idx = self.ptr
 
@@ -178,7 +193,7 @@ class VPGBuffer:
         self.ptr, self.path_start_idx = 0, 0
 
         # TODO7: Here it may help to normalize the values in self.phi_buf
-        self.phi_buf = self.phi_buf
+        self.phi_buf = (self.phi_buf - self.phi_buf.mean()) / self.phi_buf.std()
 
         data = dict(obs=self.obs_buf, act=self.act_buf, ret=self.ret_buf,
                     phi=self.phi_buf, logp=self.logp_buf)
@@ -215,6 +230,12 @@ class Agent:
 
         # Before doing any computation, always call.zero_grad on the relevant optimizer
         self.pi_optimizer.zero_grad()
+        _, logp = self.ac.pi(obs,act)
+        
+
+        loss = -(phi*logp).mean()
+        loss.backward()
+        self.pi_optimizer.step()
 
         #Hint: you need to compute a 'loss' such that its derivative with respect to the policy
         #parameters is the policy gradient. Then call loss.backwards() and pi_optimizer.step()
@@ -237,7 +258,13 @@ class Agent:
         # In each update, compute a loss for the value function, call loss.backwards() and 
         # then v_optimizer.step()
         # Before doing any computation, always call.zero_grad on the relevant optimizer
-        self.v_optimizer.zero_grad()
+        for _ in range(100):
+            self.v_optimizer.zero_grad()
+            val = self.ac.v.forward(obs)
+            loss_function = MSELoss()
+            v_loss = loss_function(val, ret)
+            v_loss.backward()
+            self.v_optimizer.step()
 
         return
 
@@ -332,7 +359,7 @@ class Agent:
         """
         # TODO3: Implement this function.
         # Currently, this just returns a random action.
-        return np.random.choice([0, 1, 2, 3])
+        return self.ac.act(torch.as_tensor(obs, dtype=torch.float32))
 
 
 def main():

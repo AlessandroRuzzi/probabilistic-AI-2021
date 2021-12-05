@@ -1,2 +1,5 @@
 venv/
 **/results_check.byte
+**/policy.mp4
+**/policy.meta.json
+__pycache__/
