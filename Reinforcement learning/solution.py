@@ -284,9 +284,9 @@ class Agent:
         # Training parameters
         # You may wish to change the following settings for the buffer and training
         # Number of training steps per epoch
-        steps_per_epoch = 3000
+        steps_per_epoch = 1500
         # Number of epochs to train for
-        epochs = 50
+        epochs = 100
         # The longest an episode can go on before cutting it off
         max_ep_len = 300
         # Discount factor for weighting future rewards
